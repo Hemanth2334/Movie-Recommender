@@ -9,7 +9,7 @@ export function runtimeText(min) {
   return min ? `${Math.floor(min / 60)}h ${min % 60}m` : null;
 }
 
-export default function Hero({ slides, weights, nRatings, onOpen }) {
+export default function Hero({ slides, weights, nRatings, onOpen, onActiveChange }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const count = slides?.length || 0;
@@ -23,6 +23,10 @@ export default function Hero({ slides, weights, nRatings, onOpen }) {
     const timer = setInterval(() => setIndex((i) => (i + 1) % count), SLIDE_MS);
     return () => clearInterval(timer);
   }, [paused, count]);
+
+  useEffect(() => {
+    if (count && onActiveChange) onActiveChange(slides[Math.min(index, count - 1)].movie);
+  }, [index, count]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!count) return <section className="hero hero-skeleton" />;
   const go = (i) => setIndex((i + count) % count);

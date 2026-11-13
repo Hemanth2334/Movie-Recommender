@@ -216,7 +216,12 @@ function HomePage({ region, onlyMine, user, ratings, onOpen, refreshKey, onEditS
   return (
     <main className="home">
       {error && <p className="error page">{error}</p>}
-      <Hero slides={data ? slides : null} weights={data?.weights} nRatings={data?.n_ratings} onOpen={onOpen} />
+      <Hero
+        slides={data ? slides : null}
+        weights={data?.weights}
+        nRatings={data?.n_ratings}
+        onOpen={onOpen}
+      />
       <div className="rows">
         {onlyMine && (
           <div className="filter-note">
