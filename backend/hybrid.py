@@ -66,35 +66,50 @@ class HybridRecommender:
         return ordered[:max_genres]
 
     def recommend_by_genre(self, user_ratings, per_genre=5, max_genres=8, genres=None,
-                           pool=60, diversity=0.5, user_id=None):
+                           pool=60, diversity=0.5, user_id=None, allowed=None):
+        """allowed = optional set of movieIds to choose from (e.g. only what the user can stream)."""
         scores = self.scores(user_ratings, user_id)
+        if allowed is not None:
+            scores[~np.isin(self.item_ids, list(allowed))] = -np.inf
         genres = genres or self.genre_order(user_ratings, max_genres)
-        shown, result = set(), []
+        shown, shown_series, result = set(), set(), []
         for g in genres:
             mask = self.genre_lists.apply(lambda gs: g in gs).values & np.isfinite(scores)
             cand = np.where(mask)[0]
-            cand = [c for c in cand if c not in shown]
+            cand = [c for c in cand if c not in shown and self.series()[c] not in shown_series]
             if not cand:
                 continue
             cand = np.array(cand)
             cand = cand[np.argsort(-scores[cand])][:pool]
             picks = self._mmr(cand, scores, per_genre, diversity)
             shown.update(picks)
+            shown_series.update(self.series()[p] for p in picks)   # one film per franchise on the page
             result.append({"genre": g, "movies": [self._movie_dict(i, scores[i]) for i in picks]})
         return result
 
+    def series(self):
+        """Franchise key per movie: 'Lord of the Rings: The Two Towers' and 'Toy Story 2' -> same key as their siblings."""
+        if getattr(self, "_series", None) is None:
+            self._series = (self.movies["clean_title"].str.split(":").str[0]
+                            .str.replace(r",\s*(The|A|An)$", "", regex=True)       # "Godfather, The" -> "Godfather"
+                            .str.replace(r"\s+(\d+|II|III|IV|V)$", "", regex=True)  # "Toy Story 2" -> "Toy Story"
+                            .str.strip().str.lower().values)
+        return self._series
+
     def _mmr(self, cand, scores, n, diversity):
-        """Maximal Marginal Relevance: good score, but not too similar to what is already picked."""
+        """Maximal Marginal Relevance: good score, but not too similar to what is already picked.
+        Two films from the same franchise are never picked for the same row."""
         rel = scale_0_1(scores[cand]) if len(cand) > 1 else np.ones(1)
         sim = self.content.similarity(cand, cand)
-        # same franchise ("Lord of the Rings: ...", "Toy Story 2") counts as a duplicate
-        series = self.movies["clean_title"].iloc[cand].str.split(":").str[0].str.replace(r"\s+\d+$", "", regex=True).str.lower().values
-        sim = np.maximum(sim, (series[:, None] == series[None, :]).astype(float))
+        series = self.series()[cand]
+        same = series[:, None] == series[None, :]
         picked = [0]
         while len(picked) < min(n, len(cand)):
             max_sim = sim[:, picked].max(axis=1)
             mmr = (1 - diversity) * rel - diversity * max_sim
-            mmr[picked] = -np.inf
+            mmr[same[:, picked].any(axis=1)] = -np.inf      # also blocks the picked ones themselves
+            if not np.isfinite(mmr).any():
+                break
             picked.append(int(np.argmax(mmr)))
         return [int(cand[p]) for p in picked]
 
