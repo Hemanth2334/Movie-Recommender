@@ -1,0 +1,26 @@
+{
+  "mf": {
+    "n_factors": 100,
+    "reg": 0.1,
+    "lr": 0.01,
+    "n_epochs": 57
+  },
+  "user_cf": {
+    "k": 80,
+    "k_topn": 100
+  },
+  "hybrid": {
+    "warm": {
+      "cf": 0.9,
+      "content": 0.05,
+      "pop": 0.05
+    },
+    "cf_mix": 0.4,
+    "cold": {
+      "cf": 0.0,
+      "content": 0.1,
+      "pop": 0.9
+    },
+    "n0": 3
+  }
+}
